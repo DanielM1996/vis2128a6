@@ -24,12 +24,229 @@ library(htmlwidgets)
 library(tidytransit)
 ```
 
-## Including Plots
+## Load Data
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo=FALSE}
+vars2010 <- load_variables(2010, "sf1")
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+```{r}
+Miami_HL <- get_decennial(geography = "block",
+                          state = "FL", county = "Miami-Dade",
+                          year = 2010,
+                          output = "wide",
+                          variables = c(tot_pop = 'P008001',
+                                        hl_pop = 'P009003'),
+                          geometry = TRUE)
+```
+
+```{r}
+Miami_HL <- Miami_HL %>%
+  mutate(pct_HL = hl_pop / tot_pop) %>%
+  filter(tot_pop > 0)
+```
+
+
+
+
+
+```{r}
+FL_state_plane <- "+proj=tmerc +lat_0=24.33333333333333 +lon_0=-81 +k=0.999941177 +x_0=200000.0001016002 +y_0=0 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs"
+
+ggplot(Miami_HL) +
+  annotation_map_tile(zoomin = 0, progress = "none", type = "stamenbw") +
+  geom_sf(color = NA, aes(fill = pct_HL), alpha = 1) +
+  coord_sf(crs = FL_state_plane) +
+  scale_fill_gradient2(low="red2", mid= "blue3", high="yellow1", 
+                      midpoint = 0.5,
+                       na.value=NA,
+                       name = "Percent of population\nidentifying as Hispanic or Latino",
+                       breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1),
+                       labels = c("0", "20%", "40%", "60%", "80%", "100%")) +
+  theme_void() 
+```
+
+
+
+```{r}
+FL_HL_palette <- colorNumeric(c("yellow1", "blue3", "red2"), Miami_HL$pct_HL)
+
+HL_map1 <- leaflet(Miami_HL) %>%
+  addProviderTiles("Stamen.TonerLite") %>%
+  addPolygons(stroke = FALSE, fillOpacity = 0.7,
+    color = ~FL_HL_palette(pct_HL)) %>%
+  addLegend("bottomright", pal = FL_HL_palette, values = ~pct_HL,
+    title = "Percent of population<br/>identifying as Hispanic or Latino",
+    labFormat = labelFormat(suffix = "%",
+                            transform = function(x) 100 * x),
+    opacity = 1)
+
+HL_map1
+```
+
+```{r}
+HL_map2 <- leaflet(Miami_HL) %>%
+  addProviderTiles("Stamen.TonerLite") %>%
+  addPolygons(color = ~FL_HL_palette(pct_HL), stroke = FALSE, fillOpacity = 0.7,
+              highlightOptions = highlightOptions(fillColor = "midnightblue", fillOpacity = 0.9),
+              label = "This is a label",
+              popup = "This is a popup") %>%
+    addLegend("bottomright", pal = FL_HL_palette, values = ~pct_HL,
+    title = "Percent of population<br/>identifying as Hispanic and Latino",
+    labFormat = labelFormat(suffix = "%",
+                            transform = function(x) 100 * x),
+    opacity = 1)
+
+HL_map2
+```
+
+
+
+```{r}
+HL_map3 <- leaflet(Miami_HL) %>%
+  addProviderTiles("Stamen.TonerLite") %>%
+  addPolygons(color = ~FL_HL_palette(pct_HL), stroke = FALSE, fillOpacity = 0.7,
+              highlightOptions = highlightOptions(fillColor = "midnightblue", fillOpacity = 0.9),
+              label = Miami_HL$NAME,
+              popup = paste("Total population: ", Miami_HL$tot_pop, "<br/>",
+                            "Hispanic or Latino identifying population: ", Miami_HL$hl_pop, " (", 
+                            round(Miami_HL$pct_HL * 100, 1), "%)", sep = "")) %>%
+    addLegend("bottomright", pal = FL_HL_palette, values = ~pct_HL,
+    title = "Percent of total population<br/>identifying as Hispanic or Latino",
+    labFormat = labelFormat(suffix = "%",
+                            transform = function(x) 100 * x),
+    opacity = 1)
+
+HL_map3
+```
+
+
+```{r}
+saveWidget(HL_map3, file="interactive_miami_hl.html")
+```
+
+
+
+```{r}
+transit_Miami <- get_acs(geography = "tract", county = "Miami-Dade", state = "FL", 
+                           year = 2019, survey = "acs5",
+                           variables = c(tot_wrkrs = "B08301_001", pt_wrkrs = "B08301_010"),
+                           output = "wide", geometry = TRUE) 
+```
+
+
+```{r}
+transit_Miami <- transit_Miami %>%
+  select(-tot_wrkrsM, -pt_wrkrsM) %>%
+  filter(tot_wrkrsE > 0) %>%
+  mutate(pct_transit = round(100 * pt_wrkrsE / tot_wrkrsE, 1))
+```
+
+
+
+```{r}
+transit_Miami_palette <- colorNumeric(c("pink", "lightblue"),
+                                transit_Miami$pct_transit)
+
+transit_Miami_map <- leaflet(transit_Miami) %>%
+  addProviderTiles("Stamen.TonerLite") %>%
+  addPolygons(fillColor = ~transit_Miami_palette(pct_transit), weight = 1, color = "gray", fillOpacity = 0.7,
+              highlightOptions = highlightOptions(fillColor = "yellow", fillOpacity = 0.9),
+              label = transit_Miami$NAME,
+              popup = paste("Total workers: ", transit_Miami$tot_wrkrsE, "<br/>",
+                            "Transit commuters: ", transit_Miami$pt_wrkrsE, " (", 
+                            transit_Miami$pct_transit, "%)", sep = "")) %>%
+    addLegend("bottomright", pal = transit_Miami_palette, values = ~pct_transit,
+    title = "Percent of workers<br/>communting by transit",
+    labFormat = labelFormat(suffix = "%"),
+    opacity = 1)
+
+transit_Miami_map
+```
+
+
+
+```{r}
+Miami_url <- feedlist[feedlist$t == "MDC Transit GTFS",]$url_d
+
+MDC_transit <- read_gtfs(Miami_url)
+
+Miami_transit_stops <- MDC_transit$stops
+
+Miami_transit_stations <- Miami_transit_stops %>%
+  filter(location_type == 1)
+```
+
+
+
+
+```{r}
+stops_sf <- st_as_sf(Miami_transit_stops, 
+                          coords = c("stop_lon", "stop_lat"), 
+                          crs = "WGS84")
+```
+
+
+
+```{r}
+st_write(stops_sf, "MDC_transit.csv", layer_options = "GEOMETRY=AS_XY", append = FALSE)
+
+stops_2 <- read_csv("MDC_transit.csv")
+```
+
+
+```{r}
+transit_map2 <- transit_Miami_map %>%
+  addMarkers(lng = Miami_transit_stops$stop_lon,
+             lat = Miami_transit_stops$stop_lat,
+             popup = Miami_transit_stops$stop_name)
+
+transit_map2
+```
+
+
+
+```{r}
+limits <- st_bbox(transit_Miami)
+
+transit_map3 <- transit_map2 %>%
+   fitBounds( lng1 = as.numeric(limits[1]),
+                lat1 = as.numeric(limits[2]),
+                lng2 = as.numeric(limits[3]),
+                lat2 = as.numeric(limits[4])) %>%
+   setMaxBounds( lng1 = as.numeric(limits[1]),
+                lat1 = as.numeric(limits[2]),
+                lng2 = as.numeric(limits[3]),
+                lat2 = as.numeric(limits[4])) 
+
+transit_map3
+```
+
+
+
+```{r}
+limits <- st_bbox(transit_Miami)
+
+transit_map4 <- transit_Miami_map %>%
+  addCircleMarkers(stroke = FALSE, color = "black", fillOpacity = 1, radius = 3,
+                   lng = Miami_transit_stops$stop_lon,
+                   lat = Miami_transit_stops$stop_lat,
+                   popup = Miami_transit_stops$stop_name) %>%
+   fitBounds( lng1 = as.numeric(limits[1]),
+                lat1 = as.numeric(limits[2]),
+                lng2 = as.numeric(limits[3]),
+                lat2 = as.numeric(limits[4])) %>%
+   setMaxBounds( lng1 = as.numeric(limits[1]),
+                lat1 = as.numeric(limits[2]),
+                lng2 = as.numeric(limits[3]),
+                lat2 = as.numeric(limits[4])) 
+
+transit_map4
+```
+
