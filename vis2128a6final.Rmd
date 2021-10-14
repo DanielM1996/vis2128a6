@@ -1,21 +1,21 @@
 ---
-title: "vis2128a6final"
+title: "The Capital of Latin America: Miami"
 author: "Daniel Montoya"
-date: "10/13/2021"
+date: "October 13, 2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Interactive Map of Miami-Dade County
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+\centerMiami is colloquially known as the Capital of Latin America because of the large number of residents who are from or are descendants of residents of South America, Central America, and/or the Caribbean. Miami often conjures images of Calle 8, cafecitos, and Spanglish and depends heavily on these regions for the city's tourism and finance sectors. Using the decennial Census data from 2010, this interactive map demonstrates the percent of total population of a given census block that identify as Hispanic or Latino. The map is interactive and allows the viewer to explore the expansive and sprawling Miami-Dade County to observe demographic changes and dynamics across the geography. The map is color-coded so as to symbolize the Colombian (or Venezuelan or Ecuadorian) flag and the pop-ups are colored in a Midnight Blue in homage to the UNASUR (Union of South American Nations) and CELAC (Community of Latin American and Caribbean States) flags.\center
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
+```{r, include=FALSE, warning=FALSE}
+
 library(leaflet)
 library(sf)
 library(tidyverse)
@@ -24,21 +24,9 @@ library(ggthemes)
 library(ggspatial)
 library(htmlwidgets)
 library(tidytransit)
-```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
 vars2010 <- load_variables(2010, "sf1")
-```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
-
-
-
-```{r}
 Miami_HL <- get_decennial(geography = "block",
                           state = "FL", county = "Miami-Dade",
                           year = 2010,
@@ -46,40 +34,13 @@ Miami_HL <- get_decennial(geography = "block",
                           variables = c(tot_pop = 'P008001',
                                         hl_pop = 'P009003'),
                           geometry = TRUE)
-```
 
-
-
-
-```{r}
 Miami_HL <- Miami_HL %>%
   mutate(pct_HL = hl_pop / tot_pop) %>%
   filter(tot_pop > 0)
-```
 
-
-
-
-```{r}
 FL_state_plane <- "+proj=tmerc +lat_0=24.33333333333333 +lon_0=-81 +k=0.999941177 +x_0=200000.0001016002 +y_0=0 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs"
 
-ggplot(Miami_HL) +
-  annotation_map_tile(zoomin = 0, progress = "none", type = "stamenbw") +
-  geom_sf(color = NA, aes(fill = pct_HL), alpha = 1) +
-  coord_sf(crs = FL_state_plane) +
-  scale_fill_gradient2(low="red2", mid= "blue3", high="yellow1", 
-                      midpoint = 0.5,
-                       na.value=NA,
-                       name = "Percent of population\nidentifying as Hispanic or Latino",
-                       breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1),
-                       labels = c("0", "20%", "40%", "60%", "80%", "100%")) +
-  theme_void()
-```
-
-
-
-
-```{r}
 FL_HL_palette <- colorNumeric(c("yellow1", "blue3", "red2"), Miami_HL$pct_HL)
 
 HL_map1 <- leaflet(Miami_HL) %>%
@@ -92,13 +53,6 @@ HL_map1 <- leaflet(Miami_HL) %>%
                             transform = function(x) 100 * x),
     opacity = 1)
 
-HL_map1
-```
-
-
-
-
-```{r}
 HL_map2 <- leaflet(Miami_HL) %>%
   addProviderTiles("Stamen.TonerLite") %>%
   addPolygons(color = ~FL_HL_palette(pct_HL), stroke = FALSE, fillOpacity = 0.7,
@@ -111,12 +65,6 @@ HL_map2 <- leaflet(Miami_HL) %>%
                             transform = function(x) 100 * x),
     opacity = 1)
 
-HL_map2
-```
-
-
-
-```{r}
 HL_map3 <- leaflet(Miami_HL) %>%
   addProviderTiles("Stamen.TonerLite") %>%
   addPolygons(color = ~FL_HL_palette(pct_HL), stroke = FALSE, fillOpacity = 0.7,
@@ -131,12 +79,18 @@ HL_map3 <- leaflet(Miami_HL) %>%
                             transform = function(x) 100 * x),
     opacity = 1)
 
+```
+
+
+```{r map, echo = FALSE, warning=FALSE, message=FALSE, fig.align="center"}
+
 HL_map3
-```
 
-
-
-```{r}
 saveWidget(HL_map3, file="interactive_miami_hl.html")
+
 ```
+
+
+
+
 
